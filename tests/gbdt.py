@@ -30,7 +30,7 @@ class GBDTLayer(torch.nn.Module):
         # Convert the LightGBM model to PyTorch
         hbclf = hummingbird.ml.convert(lgbmclf, "torch", X, extra_config={constants.FINE_TUNE: True,
                                                                           constants.FINE_TUNE_DROPOUT_PROB: dropout})
-        self = hbclf
+        return hbclf
 
 
 class GBDTModel(torch.nn.Module):
