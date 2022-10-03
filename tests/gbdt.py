@@ -16,7 +16,7 @@ from tree_utils import gbdt_implementation_map
 import lightgbm as lgb
 
 
-class GBDTLayer(torch.nn.module):
+class GBDTLayer(torch.nn.Module):
     """ Wrapper GBDT layer that trains a LightGBM model, converts initializes to torch using hummingbird """
 
     def __init__(self, X, y, n_estimators=10, random_state=1234, dropout=0.1):
