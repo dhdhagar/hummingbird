@@ -16,6 +16,31 @@ from tree_utils import gbdt_implementation_map
 import lightgbm as lgb
 
 
+class GBDTLayer(torch.nn.module):
+    """ Wrapper GBDT layer that trains a LightGBM model, converts initializes to torch using hummingbird """
+
+    def __init__(self, X, y, n_estimators=10, random_state=1234, dropout=0.1):
+        super().__init__()
+        # Instantiate the LightGBM model
+        lgbmclf = lgb.LGBMClassifier(n_estimators=n_estimators, random_state=random_state)
+        # Train the LightGBM model to get the initial params
+        lgbmclf.fit(X, y)
+        # Convert the LightGBM model to PyTorch
+        hbclf = hummingbird.ml.convert(lgbmclf, "torch", X, extra_config={constants.FINE_TUNE: True,
+                                                                          constants.FINE_TUNE_DROPOUT_PROB: dropout})
+        self = hbclf
+
+
+class GBDTModel(torch.nn.Module):
+    def __init__(self, X, y):
+        super().__init__()
+        self.gbdt = GBDTLayer(X, y)
+
+    def forward(self, x):
+        y_pred = self.gbdt(x)
+        return y_pred
+
+
 class TestSklearnGradientBoostingConverter():
     # Check tree implementation
     def test_gbdt_implementation(self):
@@ -39,9 +64,10 @@ class TestSklearnGradientBoostingConverter():
         )
 
         # model = GradientBoostingClassifier(n_estimators=10, random_state=1234)
-        model = lgb.LGBMClassifier(n_estimators=10, random_state=1234)
-        model.fit(X, y)
-        torch_model = hummingbird.ml.convert(model, "torch", X, extra_config={constants.FINE_TUNE: True, constants.FINE_TUNE_DROPOUT_PROB: 0.1})
+        # model = lgb.LGBMClassifier(n_estimators=10, random_state=1234)
+        # model.fit(X, y)
+        # torch_model = hummingbird.ml.convert(model, "torch", X, extra_config={constants.FINE_TUNE: True, constants.FINE_TUNE_DROPOUT_PROB: 0.1})
+        torch_model = GBDTModel(X, y)
         assert torch_model is not None
 
         # Do fine tuning
