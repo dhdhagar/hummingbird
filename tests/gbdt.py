@@ -69,35 +69,36 @@ class TestSklearnGradientBoostingConverter():
         # model = lgb.LGBMClassifier(n_estimators=10, random_state=1234)
         # model.fit(X, y)
         # torch_model = hummingbird.ml.convert(model, "torch", X, extra_config={constants.FINE_TUNE: True, constants.FINE_TUNE_DROPOUT_PROB: 0.1})
+        # torch_model = torch_model.model
         torch_model = GBDTModel(X, y)
         assert torch_model is not None
 
         # Do fine tuning
         loss_fn = torch.nn.BCELoss()
-        optimizer = torch.optim.AdamW(torch_model.model.parameters(), lr=1e-3, weight_decay=5e-4)
+        optimizer = torch.optim.AdamW(torch_model.parameters(), lr=1e-3, weight_decay=5e-4)
         y_tensor = torch.from_numpy(y).float()
 
         print("Original loss: ", loss_fn(torch.from_numpy(model.predict_proba(X)[:, 1]).float(), y_tensor).item())
         with torch.no_grad():
-            torch_model.model.eval()
-            print("Fine-tuning starts from loss: ", loss_fn(torch_model.model(X)[1][:, 1], y_tensor).item())
-        torch_model.model.train()
+            torch_model.eval()
+            print("Fine-tuning starts from loss: ", loss_fn(torch_model(X)[1][:, 1], y_tensor).item())
+        torch_model.train()
 
         for i in range(200):
             optimizer.zero_grad()
-            y_ = torch_model.model(X)[1][:, 1]
+            y_ = torch_model(X)[1][:, 1]
             loss = loss_fn(y_, y_tensor)
             loss.backward()
             optimizer.step()
             if i % 10 == 0:
                 with torch.no_grad():
-                    torch_model.model.eval()
-                    print("Iteration ", i, ": ", loss_fn(torch_model.model(X)[1][:, 1], y_tensor).item())
-                torch_model.model.train()
+                    torch_model.eval()
+                    print("Iteration ", i, ": ", loss_fn(torch_model(X)[1][:, 1], y_tensor).item())
+                torch_model.train()
 
         with torch.no_grad():
-            torch_model.model.eval()
-            print("Fine-tuning done with loss: ", loss_fn(torch_model.model(X)[1][:, 1], y_tensor).item())
+            torch_model.eval()
+            print("Fine-tuning done with loss: ", loss_fn(torch_model(X)[1][:, 1], y_tensor).item())
 
 
 if __name__ == "__main__":
