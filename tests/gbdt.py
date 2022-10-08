@@ -41,12 +41,12 @@ class GBDTLayer(torch.nn.Module):
 
 
 class LGBMWrapperModel(torch.nn.Module):
-    def __init__(self, X, y, params):
+    def __init__(self, X, y):
         super().__init__()
         self.model = GBDTLayer(X, y)
-        self.data_parallel = params.get("data_parallel")
-        if self.data_parallel:
-            self.model = torch.nn.DataParallel(self.model)
+        # self.data_parallel = params.get("data_parallel")
+        # if self.data_parallel:
+        #     self.model = torch.nn.DataParallel(self.model)
 
     def forward(self, x):
         y_pred = self.model(x)
