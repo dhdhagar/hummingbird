@@ -74,7 +74,7 @@ class Experiments():
     def __init__(self):
         pass
 
-    def create_dataset(self, n_samples=5000, n_features=10, n_informative=10, random_state=17, shuffle=True, test_size=0.3):
+    def create_dataset(self, n_samples=5000, n_features=10, n_informative=8, random_state=17, shuffle=True, test_size=0.3):
         # Create data for training
         X, y = make_classification(
             n_samples=n_samples, n_features=n_features, n_informative=n_informative, 
