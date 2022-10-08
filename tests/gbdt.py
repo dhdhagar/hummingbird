@@ -1,27 +1,30 @@
 """
 Classification task fine-tuning of a LightGBM hummingbird model and a vanilla MLP
 """
+import math
+from tqdm import tqdm
 
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
+
 import torch
-import math
+from torch import nn
+
 import hummingbird.ml
 from hummingbird.ml import constants
-from tree_utils import gbdt_implementation_map
 import lightgbm as lgb
-from tqdm import tqdm
 
 from IPython import embed
 
+# TODO: Add ArgumentParser
 
 def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-class GBDTLayer(torch.nn.Module):
+class GBDTLayer(nn.Module):
     """ Wrapper GBDT layer that trains a LightGBM model, converts initializes to torch using hummingbird """
 
     def __init__(self, X, y, n_estimators=10, random_state=1234, dropout=0.1):
@@ -39,32 +42,32 @@ class GBDTLayer(torch.nn.Module):
         return self.model(x)
 
 
-class GBDTModel(torch.nn.Module):
+class GBDTModel(nn.Module):
     def __init__(self, X, y):
         super().__init__()
         self.model = GBDTLayer(X, y)
         # self.data_parallel = params.get("data_parallel")
         # if self.data_parallel:
-        #     self.model = torch.nn.DataParallel(self.model)
+        #     self.model = nn.DataParallel(self.model)
 
     def forward(self, x):
         y_pred = self.model(x)
         return y_pred
 
 
-class VanillaModel(torch.nn.Module):
+class VanillaModel(nn.Module):
     def __init__(self, n_estimators, n_parameters_per_estimator, n_features, max_tree_depth):
         super().__init__()
         out_layer1 = int(2**max_tree_depth - 1)
         out_layer2 = int(math.floor((n_parameters_per_estimator + n_features) / (2**max_tree_depth) - n_features))
-        self.stack_per_estimator = torch.nn.ModuleList(torch.nn.Sequential(
-            torch.nn.Linear(n_features, out_layer1),
-            torch.nn.Dropout(p=0.1),
-            torch.nn.ReLU(),
-            torch.nn.Linear(out_layer1, out_layer2),
-            torch.nn.Dropout(p=0.1),
-            torch.nn.ReLU(),
-            torch.nn.Linear(out_layer2, 1),
+        self.stack_per_estimator = nn.ModuleList(nn.Sequential(
+            nn.Linear(n_features, out_layer1),
+            nn.Dropout(p=0.1),
+            nn.ReLU(),
+            nn.Linear(out_layer1, out_layer2),
+            nn.Dropout(p=0.1),
+            nn.ReLU(),
+            nn.Linear(out_layer2, 1),
         ) for i in range(n_estimators))
 
     def forward(self, x):
@@ -80,13 +83,15 @@ class Experiments():
         )
         print(f"Using device={self.device}\n")
 
-    def create_dataset(self, n_samples=5000, n_features=10, n_informative=8, random_state=17, shuffle=True, test_size=0.3):
-        # Create data for training
+    def create_dataset(self, n_samples=10000, n_features=10, n_informative=8, random_state=17, shuffle=True, test_size=0.2):
+        # Create a synthetic classification dataset
         X, y = make_classification(
             n_samples=n_samples, n_features=n_features, n_informative=n_informative, 
             random_state=random_state, shuffle=shuffle
         )
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+        # Split data into train, dev, and test
+        X_train_dev, self.X_test, y_train_dev, self.y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+        self.X_train, self.X_dev, self.y_train, self.y_dev = train_test_split(X_train_dev, y_train_dev, test_size=test_size/(1-test_size), random_state=random_state)
     
     def create_gbdt_hummingbird_model(self):
         # Create a hummingbird LightGBM model
@@ -151,7 +156,7 @@ class Experiments():
                 with torch.no_grad():
                     model.eval()
                     print("Iteration ", i, ": ", loss_fn(predict_fn(model, X_tensor), y_tensor).item())
-                    print("Test accuracy: ", self.evaluate(model, predict_fn)[1]*100, " %")
+                    print("Dev accuracy: ", self.evaluate(model, predict_fn, split="dev")[1]*100, " %")
                 model.train()
             
         with torch.no_grad():
@@ -164,7 +169,7 @@ class Experiments():
 
     def fine_tune_gbdt(self, 
                        model,
-                       loss_fn=torch.nn.BCELoss(), 
+                       loss_fn=nn.BCELoss(), 
                        lr=1e-3, 
                        weight_decay=5e-4,
                        predict_fn=lambda model, inputs: torch.flatten(model(inputs)[1][:, 1]),
@@ -179,7 +184,7 @@ class Experiments():
 
     def fine_tune_vanilla(self, 
                           model,
-                          loss_fn=torch.nn.BCELoss(), 
+                          loss_fn=nn.BCELoss(), 
                           lr=1e-3, 
                           weight_decay=5e-4,
                           predict_fn=lambda model, inputs: torch.flatten(model(inputs)),
@@ -192,15 +197,17 @@ class Experiments():
                              predict_fn=predict_fn,
                              iterations=iterations)
 
-    def evaluate(self, model, predict_fn):
+    def evaluate(self, model, predict_fn, split="test"):
+        # Evaluate model accuracy
         model.eval()
         with torch.no_grad():
-            # Evaluate model on the test set
-            X_tensor = torch.from_numpy(self.X_test).float().to(self.device)
+            X = self.X_test if split == "test" else self.X_dev
+            y = self.y_test if split == "test" else self.y_dev
+            X_tensor = torch.from_numpy(X).float().to(self.device)
 
             y_pred = predict_fn(model, X_tensor).cpu().numpy()
             y_pred_binary = y_pred > 0.5
-            accuracy = sum(y_pred_binary == self.y_test) / len(self.y_test)
+            accuracy = sum(y_pred_binary == y) / len(self.y_test)
 
         return y_pred, accuracy
 
@@ -214,17 +221,19 @@ class Experiments():
 
 if __name__ == "__main__":
     experiments = Experiments()
+    
+    # Create a synthetic classification dataset
     experiments.create_dataset()
     
-    # LightGBM Hummingbird
+    # Initialize and fine-tune a LightGBM Hummingbird model
     gbdt = experiments.create_gbdt_hummingbird_model()
     experiments.fine_tune_gbdt(gbdt)
 
-    # Vanilla MLP ensemble created to mimic the LGBM parameter count
+    # Initialize and fine-tune a vanilla MLP ensemble created to mimic the LightGBM parameter count
     mlp_ensemble = experiments.create_vanilla_model_from_model(gbdt)
     experiments.fine_tune_vanilla(mlp_ensemble)
 
-    # Compare test set performance
+    # Compare test set performance of the two models
     print("\nModel 1 -> GBDT")
     print("Model 2 -> Vanilla")
     experiments.compare_models(gbdt, mlp_ensemble)
