@@ -126,7 +126,7 @@ class Experiments():
         optimizer = torch.optim.AdamW(model_parameters, lr=lr, weight_decay=weight_decay)
         print("\nStarting fine-tuning:\n")
         with torch.no_grad():
-            torch_model.eval()
+            model.eval()
             print("Initial loss = ", loss_fn(predict_fn(model, self.X_train), y_tensor).item())
         model.train()
         
