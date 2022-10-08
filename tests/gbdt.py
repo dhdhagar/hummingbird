@@ -67,6 +67,7 @@ class ScratchModel(torch.nn.Module):
         ) for i in range(n_estimators))
 
     def forward(self, x):
+        x = torch.Tensor(x)
         all_logits = [stack(x) for stack in self.stack_per_estimator]
         avg_logits = sum(all_logits)/len(self.stack_per_estimator)
         return avg_logits
