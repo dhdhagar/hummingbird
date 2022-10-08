@@ -207,7 +207,7 @@ class Experiments():
     def compare_models(self, model1, model2):
         eval1 = self.evaluate(model1, predict_fn=lambda model,X: torch.flatten(model(X)[1][:, 1]))
         eval2 = self.evaluate(model2, predict_fn=lambda model,X: torch.flatten(model(X)))
-        print("\n----------------Test Accuracy:\n----------------")
+        print("\n----------------\nTest Accuracy\n----------------")
         print(f"Model 1: {eval1[1]*100} %")
         print(f"Model 2: {eval2[1]*100} %")
 
