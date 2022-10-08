@@ -147,7 +147,7 @@ class TestSklearnGradientBoostingConverter():
         y_tensor = torch.from_numpy(y).float()
         with torch.no_grad():
             torch_model_scratch.eval()
-            print("Fine-tuning starts from loss: ", loss_fn(torch_model_scratch(X)[1][:, 1], y_tensor).item())
+            print("Fine-tuning starts from loss: ", loss_fn(torch_model_scratch(X), y_tensor).item())
         torch_model_scratch.train()
         for i in range(200):
             optimizer.zero_grad()
