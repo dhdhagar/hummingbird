@@ -67,7 +67,6 @@ class ScratchModel(torch.nn.Module):
         ) for i in range(n_estimators))
 
     def forward(self, x):
-        x = torch.Tensor(x)
         all_logits = [stack(x) for stack in self.stack_per_estimator]
         avg_logits = sum(all_logits)/len(self.stack_per_estimator)
         return avg_logits
@@ -95,6 +94,7 @@ class TestSklearnGradientBoostingConverter():
         X, y = make_classification(
             n_samples=1000, n_features=10, n_informative=4, n_redundant=0, random_state=0, shuffle=False
         )
+        X = torch.from_numpy(X).float()
 
         # Create a hummingbird LGBM model
         torch_model = LGBMWrapperModel(X, y)
@@ -145,14 +145,14 @@ class TestSklearnGradientBoostingConverter():
         print("\nFINE TUNING FROM-SCRATCH MODEL:\n----------------------\n")
         loss_fn = torch.nn.BCELoss()
         optimizer = torch.optim.AdamW(torch_model_scratch.parameters(), lr=1e-3, weight_decay=5e-4)
-        y_tensor = torch.from_numpy(y).float()
+        y_tensor = torch.from_numpy(y).float()[:, None]
         with torch.no_grad():
             torch_model_scratch.eval()
             print("Fine-tuning starts from loss: ", loss_fn(torch_model_scratch(X), y_tensor).item())
         torch_model_scratch.train()
         for i in range(200):
             optimizer.zero_grad()
-            y_ = torch_model_scratch(X)[1][:, 1]
+            y_ = torch_model_scratch(X)
             loss = loss_fn(y_, y_tensor)
             loss.backward()
             optimizer.step()
