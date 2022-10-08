@@ -13,6 +13,7 @@ import hummingbird.ml
 from hummingbird.ml import constants
 from tree_utils import gbdt_implementation_map
 import lightgbm as lgb
+from tqdm import tqdm
 
 from IPython import embed
 
