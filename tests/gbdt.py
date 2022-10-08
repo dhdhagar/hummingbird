@@ -76,7 +76,7 @@ class VanillaModel(torch.nn.Module):
 class Experiments():
     def __init__(self, params={}):
         self.device = torch.device(
-            "cuda" if torch.cuda.is_available() and not params["no_cuda"] else "cpu"
+            "cuda" if torch.cuda.is_available() and ("no_cuda" in params or not params["no_cuda"]) else "cpu"
         )
         print(f"Using device={self.device}\n")
 
