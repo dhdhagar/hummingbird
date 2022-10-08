@@ -30,16 +30,19 @@ class GBDTLayer(torch.nn.Module):
         # Convert the LightGBM model to PyTorch
         hbclf = hummingbird.ml.convert(lgbmclf, "torch", X, extra_config={constants.FINE_TUNE: True,
                                                                           constants.FINE_TUNE_DROPOUT_PROB: dropout})
-        self = hbclf.model
-
-
-class GBDTModel(torch.nn.Module):
-    def __init__(self, X, y):
-        super().__init__()
-        self.gbdt = GBDTLayer(X, y)
+        self.model = hbclf
 
     def forward(self, x):
-        y_pred = self.gbdt(x)
+        return self.model(x)
+
+
+class MyModel(torch.nn.Module):
+    def __init__(self, X, y):
+        super().__init__()
+        self.model = GBDTLayer(X, y)
+
+    def forward(self, x):
+        y_pred = self.model(x)
         return y_pred
 
 
@@ -70,7 +73,7 @@ class TestSklearnGradientBoostingConverter():
         # model.fit(X, y)
         # torch_model = hummingbird.ml.convert(model, "torch", X, extra_config={constants.FINE_TUNE: True, constants.FINE_TUNE_DROPOUT_PROB: 0.1})
         # torch_model = torch_model.model
-        torch_model = GBDTModel(X, y)
+        torch_model = MyModel(X, y)
         assert torch_model is not None
 
         # Do fine tuning
