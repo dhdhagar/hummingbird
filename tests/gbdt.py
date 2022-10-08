@@ -196,12 +196,11 @@ class Experiments():
         model.eval()
         with torch.no_grad():
             # Evaluate model on the test set
-            y_tensor = torch.from_numpy(self.y_test).float().to(self.device)
             X_tensor = torch.from_numpy(self.X_test).float().to(self.device)
 
-            y_pred = predict_fn(model, X_tensor).item()
+            y_pred = predict_fn(model, X_tensor).cpu().numpy()
             y_pred_binary = y_pred > 0.5
-            accuracy = sum(y_pred_binary == y_tensor) / len(y_tensor)
+            accuracy = sum(y_pred_binary == self.y_test) / len(self.y_test)
 
         return y_pred, accuracy
 
