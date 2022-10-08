@@ -58,13 +58,13 @@ class ScratchModel(torch.nn.Module):
         super().__init__()
         out_layer1 = int(2**tree_depth - 1)
         out_layer2 = int(math.floor((n_parameters + n_features) / (2**tree_depth) - n_features))
-        self.stack_per_estimator = [torch.nn.Sequential(
+        self.stack_per_estimator = torch.nn.ModuleList(torch.nn.Sequential(
             torch.nn.Linear(n_features, out_layer1),
             torch.nn.ReLU(),
             torch.nn.Linear(out_layer1, out_layer2),
             torch.nn.ReLU(),
             torch.nn.Linear(out_layer2, 1),
-        ) for i in range(n_estimators)]
+        ) for i in range(n_estimators))
 
     def forward(self, x):
         all_logits = [stack(x) for stack in self.stack_per_estimator]
