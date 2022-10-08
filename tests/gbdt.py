@@ -115,6 +115,7 @@ class Experiments():
     def fine_tune_model(self, model, loss_fn, lr, weight_decay, predict_fn, iterations):
         # Fine tune torch model
         y_tensor = torch.from_numpy(self.y_train).float()
+        X_tensor = torch.from_numpy(self.X_train).float()
         model_parameters = None
         try:
             model_parameters = model.parameters()
@@ -128,24 +129,24 @@ class Experiments():
         print("\nStarting fine-tuning:\n")
         with torch.no_grad():
             model.eval()
-            print("Initial loss = ", loss_fn(predict_fn(model, self.X_train), y_tensor).item())
+            print("Initial loss = ", loss_fn(predict_fn(model, X_tensor), y_tensor).item())
         model.train()
         
-        for i in tqdm(range(iterations)):
+        for i in range(iterations):
             # Full gradient descent
             optimizer.zero_grad()
-            y_ = predict_fn(model, self.X_train)
+            y_ = predict_fn(model, X_tensor)
             loss = loss_fn(y_, y_tensor)
             loss.backward()
             optimizer.step()
             if i % 10 == 0:
                 with torch.no_grad():
                     model.eval()
-                    print("Iteration ", i, ": ", loss_fn(predict_fn(model, self.X_train), y_tensor).item())
+                    print("Iteration ", i, ": ", loss_fn(predict_fn(model, X_tensor), y_tensor).item())
                 model.train()
         with torch.no_grad():
             model.eval()
-            print("Fine-tuning done with loss = ", loss_fn(predict_fn(model, self.X_train), y_tensor).item())
+            print("Fine-tuning done with loss = ", loss_fn(predict_fn(model, X_tensor), y_tensor).item())
 
 
     def fine_tune_gbdt(self, 
