@@ -169,7 +169,7 @@ class Experiments():
                        weight_decay=5e-4,
                        predict_fn=lambda model, inputs: torch.flatten(model(inputs)[1][:, 1]),
                        iterations=200):
-        print("\nFINE-TUNING GBDT:\n-----------------\n")
+        print("\nFINE-TUNING GBDT:\n-----------------")
         self.fine_tune_model(model,
                              loss_fn=loss_fn, 
                              lr=lr, 
@@ -184,7 +184,7 @@ class Experiments():
                           weight_decay=5e-4,
                           predict_fn=lambda model, inputs: torch.flatten(model(inputs)),
                           iterations=200):
-        print("\nFINE-TUNING VANILLA:\n-----------------\n")
+        print("\nFINE-TUNING VANILLA:\n-----------------")
         self.fine_tune_model(model,
                              loss_fn=loss_fn, 
                              lr=lr, 
@@ -207,7 +207,7 @@ class Experiments():
     def compare_models(self, model1, model2):
         eval1 = self.evaluate(model1, predict_fn=lambda model,X: torch.flatten(model(X)[1][:, 1]))
         eval2 = self.evaluate(model2, predict_fn=lambda model,X: torch.flatten(model(X)))
-        print("Test Accuracy:\n----------------")
+        print("\n----------------Test Accuracy:\n----------------")
         print(f"Model 1: {eval1[1]*100} %")
         print(f"Model 2: {eval2[1]*100} %")
 
@@ -225,6 +225,6 @@ if __name__ == "__main__":
     experiments.fine_tune_vanilla(mlp_ensemble)
 
     # Compare test set performance
-    print("\nModel 1: GBDT")
-    print("Model 2: Vanilla")
+    print("\nModel 1 -> GBDT")
+    print("Model 2 -> Vanilla")
     experiments.compare_models(gbdt, mlp_ensemble)
