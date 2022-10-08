@@ -94,7 +94,6 @@ class TestSklearnGradientBoostingConverter():
         X, y = make_classification(
             n_samples=1000, n_features=10, n_informative=4, n_redundant=0, random_state=0, shuffle=False
         )
-        X = torch.from_numpy(X).float()
 
         # Create a hummingbird LGBM model
         torch_model = LGBMWrapperModel(X, y)
@@ -142,6 +141,7 @@ class TestSklearnGradientBoostingConverter():
 
         # Do fine tuning on from-scratch model
         loss = None
+        X = torch.from_numpy(X).float()
         print("\nFINE TUNING FROM-SCRATCH MODEL:\n----------------------\n")
         loss_fn = torch.nn.BCELoss()
         optimizer = torch.optim.AdamW(torch_model_scratch.parameters(), lr=1e-3, weight_decay=5e-4)
