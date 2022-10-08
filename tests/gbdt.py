@@ -59,8 +59,10 @@ class VanillaModel(torch.nn.Module):
         out_layer2 = int(math.floor((n_parameters_per_estimator + n_features) / (2**max_tree_depth) - n_features))
         self.stack_per_estimator = torch.nn.ModuleList(torch.nn.Sequential(
             torch.nn.Linear(n_features, out_layer1),
+            torch.nn.Dropout(p=0.1),
             torch.nn.ReLU(),
             torch.nn.Linear(out_layer1, out_layer2),
+            torch.nn.Dropout(p=0.1),
             torch.nn.ReLU(),
             torch.nn.Linear(out_layer2, 1),
         ) for i in range(n_estimators))
@@ -139,14 +141,20 @@ class Experiments():
             loss = loss_fn(y_, y_tensor)
             loss.backward()
             optimizer.step()
+            
             if i % 10 == 0:
                 with torch.no_grad():
                     model.eval()
                     print("Iteration ", i, ": ", loss_fn(predict_fn(model, X_tensor), y_tensor).item())
-                model.train()
+            
+            with torch.no_grad():
+                model.eval()
+                print("Test accuracy: ", self.evaluate(model, predict_fn)[1]*100, " %")
+            model.train()
         with torch.no_grad():
             model.eval()
             print("Fine-tuning done with loss = ", loss_fn(predict_fn(model, X_tensor), y_tensor).item())
+            print("Test accuracy: ", self.evaluate(model, predict_fn)[1]*100, " %")
 
 
     def fine_tune_gbdt(self, 
@@ -179,6 +187,24 @@ class Experiments():
                              predict_fn=predict_fn,
                              iterations=iterations)
 
+    def evaluate(self, model, predict_fn):
+        # Evaluate model on the test set
+        y_tensor = torch.from_numpy(self.y_test).float()
+        X_tensor = torch.from_numpy(self.X_test).float()
+
+        y_pred = predict_fn(model, X_tensor)
+        y_pred_binary = y_pred > 0.5
+        accuracy = sum(y_pred_binary == y_tensor) / len(y_tensor)
+
+        return y_pred, accuracy
+
+    def compare_models(self, model1, model2):
+        eval1 = evaluate(model1, predict_fn=lambda model,X: torch.flatten(model(X)[1][:, 1]))
+        eval2 = evaluate(model2, predict_fn=lambda model,X: torch.flatten(model(X)))
+
+        print(f"Model 1: {eval1[1]*100} %")
+        print(f"Model 2: {eval2[1]*100} %")
+
 
 if __name__ == "__main__":
     experiments = Experiments()
@@ -191,3 +217,9 @@ if __name__ == "__main__":
     # Vanilla MLP ensemble created to mimic the LGBM parameter count
     mlp_ensemble = experiments.create_vanilla_model_from_model(gbdt)
     experiments.fine_tune_vanilla(mlp_ensemble)
+
+    # Compare test set performance
+    print("\nModel 1: GBDT")
+    print("Model 2: Vanilla")
+    experiments.compare_models(gbdt, mlp_ensemble)
+    
