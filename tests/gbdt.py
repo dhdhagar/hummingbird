@@ -30,7 +30,7 @@ class GBDTLayer(torch.nn.Module):
         # Convert the LightGBM model to PyTorch
         hbclf = hummingbird.ml.convert(lgbmclf, "torch", X, extra_config={constants.FINE_TUNE: True,
                                                                           constants.FINE_TUNE_DROPOUT_PROB: dropout})
-        self.model = hbclf
+        self.model = hbclf.model
 
     def forward(self, x):
         return self.model(x)
@@ -78,7 +78,7 @@ class TestSklearnGradientBoostingConverter():
 
         # Do fine tuning
         loss_fn = torch.nn.BCELoss()
-        optimizer = torch.optim.AdamW(torch_model.parameters(), lr=1e-3, weight_decay=5e-4)
+        optimizer = torch.optim.AdamW(torch_model.model.parameters(), lr=1e-3, weight_decay=5e-4)
         y_tensor = torch.from_numpy(y).float()
 
         print("Original loss: ", loss_fn(torch.from_numpy(model.predict_proba(X)[:, 1]).float(), y_tensor).item())
