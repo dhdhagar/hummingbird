@@ -74,8 +74,11 @@ class VanillaModel(torch.nn.Module):
 
 
 class Experiments():
-    def __init__(self):
-        pass
+    def __init__(self, params={}):
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() and not params["no_cuda"] else "cpu"
+        )
+        print(f"Using device={self.device}\n")
 
     def create_dataset(self, n_samples=5000, n_features=10, n_informative=8, random_state=17, shuffle=True, test_size=0.3):
         # Create data for training
@@ -92,6 +95,7 @@ class Experiments():
         print(f"Created LightGBM hummingbird model")
         print(model)
         print(f"Parameter count: {count_parameters(model)}")
+        model = model.to(self.device)
         return model
 
     def create_vanilla_model(self, n_parameters_per_estimator, n_estimators=10,
@@ -103,6 +107,7 @@ class Experiments():
         print(f"Created vanilla model")
         print(model)
         print(f"Parameter count: {count_parameters(model)}")
+        model = model.to(self.device)
         return model
 
     def create_vanilla_model_from_model(self, model_to_mimic, n_estimators=10,
@@ -116,8 +121,8 @@ class Experiments():
 
     def fine_tune_model(self, model, loss_fn, lr, weight_decay, predict_fn, iterations):
         # Fine tune torch model
-        y_tensor = torch.from_numpy(self.y_train).float()
-        X_tensor = torch.from_numpy(self.X_train).float()
+        y_tensor = torch.from_numpy(self.y_train).float().to(self.device)
+        X_tensor = torch.from_numpy(self.X_train).float().to(self.device)
         model_parameters = None
         try:
             model_parameters = model.parameters()
@@ -188,19 +193,21 @@ class Experiments():
                              iterations=iterations)
 
     def evaluate(self, model, predict_fn):
-        # Evaluate model on the test set
-        y_tensor = torch.from_numpy(self.y_test).float()
-        X_tensor = torch.from_numpy(self.X_test).float()
+        model.eval()
+        with torch.no_grad():
+            # Evaluate model on the test set
+            y_tensor = torch.from_numpy(self.y_test).float().to(self.device)
+            X_tensor = torch.from_numpy(self.X_test).float().to(self.device)
 
-        y_pred = predict_fn(model, X_tensor)
-        y_pred_binary = y_pred > 0.5
-        accuracy = sum(y_pred_binary == y_tensor) / len(y_tensor)
+            y_pred = predict_fn(model, X_tensor).item()
+            y_pred_binary = y_pred > 0.5
+            accuracy = sum(y_pred_binary == y_tensor) / len(y_tensor)
 
         return y_pred, accuracy
 
     def compare_models(self, model1, model2):
-        eval1 = evaluate(model1, predict_fn=lambda model,X: torch.flatten(model(X)[1][:, 1]))
-        eval2 = evaluate(model2, predict_fn=lambda model,X: torch.flatten(model(X)))
+        eval1 = self.evaluate(model1, predict_fn=lambda model,X: torch.flatten(model(X)[1][:, 1]))
+        eval2 = self.evaluate(model2, predict_fn=lambda model,X: torch.flatten(model(X)))
 
         print(f"Model 1: {eval1[1]*100} %")
         print(f"Model 2: {eval2[1]*100} %")
@@ -222,4 +229,3 @@ if __name__ == "__main__":
     print("\nModel 1: GBDT")
     print("Model 2: Vanilla")
     experiments.compare_models(gbdt, mlp_ensemble)
-    
