@@ -1,26 +1,24 @@
 """
-Tests Sklearn RandomForest, DecisionTree, ExtraTrees converters.
+Classification task fine-tuning of a LightGBM hummingbird model and a vanilla MLP
 """
-import warnings
 
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
-
 import torch
 import math
-
 import hummingbird.ml
 from hummingbird.ml import constants
 from tree_utils import gbdt_implementation_map
-
 import lightgbm as lgb
 
 from IPython import embed
 
 
 def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 
 class GBDTLayer(torch.nn.Module):
     """ Wrapper GBDT layer that trains a LightGBM model, converts initializes to torch using hummingbird """
@@ -40,7 +38,7 @@ class GBDTLayer(torch.nn.Module):
         return self.model(x)
 
 
-class LGBMWrapperModel(torch.nn.Module):
+class GBDTModel(torch.nn.Module):
     def __init__(self, X, y):
         super().__init__()
         self.model = GBDTLayer(X, y)
@@ -53,11 +51,11 @@ class LGBMWrapperModel(torch.nn.Module):
         return y_pred
 
 
-class ScratchModel(torch.nn.Module):
-    def __init__(self, n_estimators, n_parameters, n_features, tree_depth):
+class VanillaModel(torch.nn.Module):
+    def __init__(self, n_estimators, n_parameters_per_estimator, n_features, max_tree_depth):
         super().__init__()
-        out_layer1 = int(2**tree_depth - 1)
-        out_layer2 = int(math.floor((n_parameters + n_features) / (2**tree_depth) - n_features))
+        out_layer1 = int(2**max_tree_depth - 1)
+        out_layer2 = int(math.floor((n_parameters_per_estimator + n_features) / (2**max_tree_depth) - n_features))
         self.stack_per_estimator = torch.nn.ModuleList(torch.nn.Sequential(
             torch.nn.Linear(n_features, out_layer1),
             torch.nn.ReLU(),
@@ -72,100 +70,122 @@ class ScratchModel(torch.nn.Module):
         return torch.sigmoid(avg_logits)
 
 
-class TestSklearnGradientBoostingConverter():
-    # Check tree implementation
-    def test_gbdt_implementation(self):
-        warnings.filterwarnings("ignore")
-        np.random.seed(0)
-        X = np.random.rand(10, 1)
-        X = np.array(X, dtype=np.float32)
-        y = np.random.randint(2, size=10)
+class Experiments():
+    def __init__(self):
+        pass
 
-        model = GradientBoostingClassifier(n_estimators=1, max_depth=1)
-        model.fit(X, y)
-
-        torch_model = hummingbird.ml.convert(model, "torch", extra_config={constants.FINE_TUNE: True})
-        self.assertIsNotNone(torch_model)
-        self.assertTrue(str(type(list(torch_model.model._operators)[0])) == gbdt_implementation_map["gemm_fine_tune"])
-
-    # Fine tune GBDT binary classifier.
-    def test_gbdt_classifier_fine_tune(self):
+    def create_dataset(self, n_samples=5000, n_features=10, n_informative=10, random_state=17, shuffle=True, test_size=0.3):
         # Create data for training
         X, y = make_classification(
-            n_samples=1000, n_features=10, n_informative=4, n_redundant=0, random_state=0, shuffle=False
+            n_samples=n_samples, n_features=n_features, n_informative=n_informative, 
+            random_state=random_state, shuffle=shuffle
         )
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+    
+    def create_gbdt_hummingbird_model(self):
+        # Create a hummingbird LightGBM model
+        model = GBDTModel(self.X_train, self.y_train)
+        assert model is not None
+        print(f"Created LightGBM hummingbird model")
+        print(model)
+        print(f"Parameter count: {count_parameters(model)}")
+        return model
 
-        # Create a hummingbird LGBM model
-        torch_model = LGBMWrapperModel(X, y)
-        assert torch_model is not None
-        print(f"Created LGBM hummingbird model")
-        print(torch_model)
-        print(f"Parameter count: {count_parameters(torch_model)}")
+    def create_vanilla_model(self, n_parameters_per_estimator, n_estimators=10,
+                             n_features=10, max_tree_depth=5):
+        # Create an ensemble model of fully-connected 3-layer MLPs
+        model = VanillaModel(n_estimators=n_estimators, n_parameters_per_estimator=n_parameters_per_estimator,
+                             n_features=n_features, max_tree_depth=max_tree_depth)
+        assert model is not None
+        print(f"Created vanilla model")
+        print(model)
+        print(f"Parameter count: {count_parameters(model)}")
+        return model
 
-        # Create a from-scratch model to mimic the hummingbird parameter count and structure
-        n_parameters = count_parameters(torch_model)
-        n_estimators = 10
+    def create_vanilla_model_from_model(self, model_to_mimic, n_estimators=10,
+                                         n_features=10, max_tree_depth=5):
+        # Create a vanilla model based on the parameter count of another model
+        n_parameters = count_parameters(model_to_mimic)
         n_parameters_per_estimator = n_parameters // n_estimators
-        n_features = 10
-        max_tree_depth = 5
-        torch_model_scratch = ScratchModel(n_estimators=n_estimators, n_parameters=n_parameters_per_estimator,
-                                           n_features=n_features, tree_depth=max_tree_depth)
-        assert torch_model_scratch is not None
-        print(f"Created scratch model")
-        print(torch_model_scratch)
-        print(f"Parameter count: {count_parameters(torch_model_scratch)}")
+        model = self.create_vanilla_model(n_parameters_per_estimator, n_estimators=n_estimators,
+                                          n_features=n_features, max_tree_depth=max_tree_depth)
+        return model
 
-        # Do fine tuning on hummingbird
-        print("\nFINE TUNING HUMMINGBIRD:\n----------------------\n")
-        loss_fn = torch.nn.BCELoss()
-        optimizer = torch.optim.AdamW(torch_model.model.parameters(), lr=1e-3, weight_decay=5e-4)
-        y_tensor = torch.from_numpy(y).float()
+    def fine_tune_model(self, model, loss_fn, lr, weight_decay, predict_fn, iterations):
+        # Fine tune torch model
+        y_tensor = torch.from_numpy(self.y_train).float()
+        model_parameters = None
+        try:
+            model_parameters = model.parameters()
+        except:
+            try:
+                model_parameters = model.model.parameters()
+            except:
+                raise ValueError("Error: Model parameters could not be found")
+        
+        optimizer = torch.optim.AdamW(model_parameters, lr=lr, weight_decay=weight_decay)
+        print("\nStarting fine-tuning:\n")
         with torch.no_grad():
             torch_model.eval()
-            print("Fine-tuning starts from loss: ", loss_fn(torch_model(X)[1][:, 1], y_tensor).item())
-        torch_model.train()
-        for i in range(200):
+            print("Initial loss = ", loss_fn(predict_fn(model, self.X_train), y_tensor).item())
+        model.train()
+        
+        for i in tqdm(range(iterations)):
+            # Full gradient descent
             optimizer.zero_grad()
-            y_ = torch_model(X)[1][:, 1]
+            y_ = predict_fn(model, self.X_train)
             loss = loss_fn(y_, y_tensor)
             loss.backward()
             optimizer.step()
             if i % 10 == 0:
                 with torch.no_grad():
-                    torch_model.eval()
-                    print("Iteration ", i, ": ", loss_fn(torch_model(X)[1][:, 1], y_tensor).item())
-                torch_model.train()
+                    model.eval()
+                    print("Iteration ", i, ": ", loss_fn(predict_fn(model, self.X_train), y_tensor).item())
+                model.train()
         with torch.no_grad():
-            torch_model.eval()
-            print("Fine-tuning done with loss: ", loss_fn(torch_model(X)[1][:, 1], y_tensor).item())
+            model.eval()
+            print("Fine-tuning done with loss = ", loss_fn(predict_fn(model, self.X_train), y_tensor).item())
 
-        # Do fine tuning on from-scratch model
-        loss = None
-        X = torch.from_numpy(X).float()
-        print("\nFINE TUNING FROM-SCRATCH MODEL:\n----------------------\n")
-        loss_fn = torch.nn.BCELoss()
-        optimizer = torch.optim.AdamW(torch_model_scratch.parameters(), lr=1e-3, weight_decay=5e-4)
-        y_tensor = torch.from_numpy(y).float()[:, None]
-        with torch.no_grad():
-            torch_model_scratch.eval()
-            print("Fine-tuning starts from loss: ", loss_fn(torch_model_scratch(X), y_tensor).item())
-        torch_model_scratch.train()
-        for i in range(200):
-            optimizer.zero_grad()
-            y_ = torch_model_scratch(X)
-            loss = loss_fn(y_, y_tensor)
-            loss.backward()
-            optimizer.step()
-            if i % 10 == 0:
-                with torch.no_grad():
-                    torch_model_scratch.eval()
-                    print("Iteration ", i, ": ", loss_fn(torch_model_scratch(X), y_tensor).item())
-                torch_model_scratch.train()
-        with torch.no_grad():
-            torch_model_scratch.eval()
-            print("Fine-tuning done with loss: ", loss_fn(torch_model_scratch(X), y_tensor).item())
+
+    def fine_tune_gbdt(self, 
+                       model,
+                       loss_fn=torch.nnBCELoss(), 
+                       lr=1e-3, 
+                       weight_decay=5e-4,
+                       predict_fn=lambda model, inputs: torch.flatten(model(inputs)[1][:, 1]),
+                       iterations=200):
+        print("\nFINE-TUNING GBDT:\n-----------------\n")
+        self.fine_tune_model(model,
+                             loss_fn=loss_fn, 
+                             lr=lr, 
+                             weight_decay=weight_decay,
+                             predict_fn=predict_fn,
+                             iterations=iterations)
+
+    def fine_tune_vanilla(self, 
+                          model,
+                          loss_fn=torch.nnBCELoss(), 
+                          lr=1e-3, 
+                          weight_decay=5e-4,
+                          predict_fn=lambda model, inputs: torch.flatten(model(inputs)),
+                          iterations=200):
+        print("\nFINE-TUNING VANILLA:\n-----------------\n")
+        self.fine_tune_model(model,
+                             loss_fn=loss_fn, 
+                             lr=lr, 
+                             weight_decay=weight_decay,
+                             predict_fn=predict_fn,
+                             iterations=iterations)
+
 
 if __name__ == "__main__":
-    testobj = TestSklearnGradientBoostingConverter()
-    testobj.test_gbdt_classifier_fine_tune()
+    experiments = Experiments()
+    experiments.create_dataset()
+    
+    # LightGBM Hummingbird
+    gbdt = experiments.create_gbdt_hummingbird_model()
+    experiments.fine_tune_gbdt(gbdt)
 
+    # Vanilla MLP ensemble created to mimic the LGBM parameter count
+    mlp_ensemble = experiments.create_vanilla_model_from_model(gbdt)
+    experiments.fine_tune_vanilla(mlp_ensemble)
