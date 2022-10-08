@@ -107,7 +107,7 @@ class TestSklearnGradientBoostingConverter():
         n_estimators = 10
         n_parameters_per_estimator = n_parameters // n_estimators
         n_features = 10
-        max_tree_depth = 32
+        max_tree_depth = 5
         torch_model_scratch = ScratchModel(n_estimators=n_estimators, n_parameters=n_parameters_per_estimator,
                                            n_features=n_features, tree_depth=max_tree_depth)
         assert torch_model_scratch is not None
