@@ -7,7 +7,9 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.datasets import make_classification
 from sklearn.metrics import roc_auc_score
+
 import torch
+
 
 import hummingbird.ml
 from hummingbird.ml import constants
@@ -51,17 +53,17 @@ class LGBMWrapperModel(torch.nn.Module):
         return y_pred
 
 
-class ScratchModel(nn.Module):
+class ScratchModel(torch.nn.Module):
     def __init__(self, n_estimators, n_parameters, n_features, tree_depth):
         super().__init__()
         out_layer1 = 2**tree_depth - 1
         out_layer2 = (n_parameters + n_features) / (2**tree_depth) - n_features
-        self.stack_per_estimator = [nn.Sequential(
-            nn.Linear(n_features, out_layer1),
-            nn.ReLU(),
-            nn.Linear(out_layer1, out_layer2),
-            nn.ReLU(),
-            nn.Linear(out_layer2, 1),
+        self.stack_per_estimator = [torch.nn.Sequential(
+            torch.nn.Linear(n_features, out_layer1),
+            torch.nn.ReLU(),
+            torch.nn.Linear(out_layer1, out_layer2),
+            torch.nn.ReLU(),
+            torch.nn.Linear(out_layer2, 1),
         ) for i in range(n_estimators)]
 
     def forward(self, x):
