@@ -149,7 +149,7 @@ class Experiments():
 
     def fine_tune_gbdt(self, 
                        model,
-                       loss_fn=torch.nnBCELoss(), 
+                       loss_fn=torch.nn.BCELoss(), 
                        lr=1e-3, 
                        weight_decay=5e-4,
                        predict_fn=lambda model, inputs: torch.flatten(model(inputs)[1][:, 1]),
@@ -164,7 +164,7 @@ class Experiments():
 
     def fine_tune_vanilla(self, 
                           model,
-                          loss_fn=torch.nnBCELoss(), 
+                          loss_fn=torch.nn.BCELoss(), 
                           lr=1e-3, 
                           weight_decay=5e-4,
                           predict_fn=lambda model, inputs: torch.flatten(model(inputs)),
