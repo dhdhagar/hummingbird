@@ -81,7 +81,7 @@ class TestSklearnGradientBoostingConverter():
         optimizer = torch.optim.AdamW(torch_model.model.parameters(), lr=1e-3, weight_decay=5e-4)
         y_tensor = torch.from_numpy(y).float()
 
-        print("Original loss: ", loss_fn(torch.from_numpy(model.predict_proba(X)[:, 1]).float(), y_tensor).item())
+        # print("Original loss: ", loss_fn(torch.from_numpy(model.predict_proba(X)[:, 1]).float(), y_tensor).item())
         with torch.no_grad():
             torch_model.eval()
             print("Fine-tuning starts from loss: ", loss_fn(torch_model(X)[1][:, 1], y_tensor).item())
