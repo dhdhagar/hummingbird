@@ -9,7 +9,7 @@ from sklearn.datasets import make_classification
 from sklearn.metrics import roc_auc_score
 
 import torch
-
+import math
 
 import hummingbird.ml
 from hummingbird.ml import constants
@@ -56,8 +56,8 @@ class LGBMWrapperModel(torch.nn.Module):
 class ScratchModel(torch.nn.Module):
     def __init__(self, n_estimators, n_parameters, n_features, tree_depth):
         super().__init__()
-        out_layer1 = 2**tree_depth - 1
-        out_layer2 = (n_parameters + n_features) / (2**tree_depth) - n_features
+        out_layer1 = int(2**tree_depth - 1)
+        out_layer2 = int(math.floor((n_parameters + n_features) / (2**tree_depth) - n_features))
         self.stack_per_estimator = [torch.nn.Sequential(
             torch.nn.Linear(n_features, out_layer1),
             torch.nn.ReLU(),
@@ -107,7 +107,7 @@ class TestSklearnGradientBoostingConverter():
         n_estimators = 10
         n_parameters_per_estimator = n_parameters // n_estimators
         n_features = 10
-        max_tree_depth = 10
+        max_tree_depth = 32
         torch_model_scratch = ScratchModel(n_estimators=n_estimators, n_parameters=n_parameters_per_estimator,
                                            n_features=n_features, tree_depth=max_tree_depth)
         assert torch_model_scratch is not None
