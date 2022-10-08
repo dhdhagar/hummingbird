@@ -151,15 +151,15 @@ class Experiments():
                 with torch.no_grad():
                     model.eval()
                     print("Iteration ", i, ": ", loss_fn(predict_fn(model, X_tensor), y_tensor).item())
+                    print("Test accuracy: ", self.evaluate(model, predict_fn)[1]*100, " %")
+                model.train()
             
-            with torch.no_grad():
-                model.eval()
-                print("Test accuracy: ", self.evaluate(model, predict_fn)[1]*100, " %")
-            model.train()
         with torch.no_grad():
             model.eval()
+            print("----------------")
             print("Fine-tuning done with loss = ", loss_fn(predict_fn(model, X_tensor), y_tensor).item())
             print("Test accuracy: ", self.evaluate(model, predict_fn)[1]*100, " %")
+            print("----------------")
 
 
     def fine_tune_gbdt(self, 
@@ -207,7 +207,7 @@ class Experiments():
     def compare_models(self, model1, model2):
         eval1 = self.evaluate(model1, predict_fn=lambda model,X: torch.flatten(model(X)[1][:, 1]))
         eval2 = self.evaluate(model2, predict_fn=lambda model,X: torch.flatten(model(X)))
-
+        print("Test Accuracy:\n----------------")
         print(f"Model 1: {eval1[1]*100} %")
         print(f"Model 2: {eval2[1]*100} %")
 
