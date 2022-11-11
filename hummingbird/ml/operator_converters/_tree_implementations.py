@@ -648,15 +648,17 @@ class GEMMTreeImplTraining(GEMMTreeImpl):
         if self.opt_level < 2:
             self.bias_1.requires_grad_(False)
             
-        self.temp = 1.0  # Temperature controlling the boolean approximation
+        self.inv_temp = 1.0  # Temperature controlling the boolean approximation. ->inf converts to the original boolean-valued fn.
         if constants.FINE_TUNE_TEMP in extra_config:
-            self.temp = 1 / extra_config[constants.FINE_TUNE_TEMP]
+            if extra_config[constants.FINE_TUNE_TEMP] <= 0:
+                raise ValueError("FINE_TUNE_TEMP cannot be less than or equal to 0")
+            self.inv_temp = 1 / extra_config[constants.FINE_TUNE_TEMP]
 
     def first_layer_activation(self, x):
-        return self.dropout((x * self.temp).tanh_())
+        return self.dropout((x * self.inv_temp).tanh_())
 
     def second_layer_activation(self, x):
-        return self.dropout((x * self.temp).tanh_())
+        return self.dropout((x * self.inv_temp).tanh_())
 
 
 class GEMMGBDTImplTraining(GEMMTreeImplTraining):

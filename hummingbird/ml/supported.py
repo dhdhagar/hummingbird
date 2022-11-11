@@ -519,5 +519,5 @@ TREE_OPT_LEVEL = "tree_opt_level"
 TREE_OPT_LEVEL is set to 4 by default."""
 
 FINE_TUNE_TEMP = "fine_tune_temp"
-"""Determines the temperature, which controls the boolean approximation. Default is 1. 0 means
-no approximation."""
+"""Determines the temperature, which controls the boolean approximation. Values allowed in R+. Default is 1. 
+->0 means no approximation."""
