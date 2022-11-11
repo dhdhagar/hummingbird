@@ -647,12 +647,16 @@ class GEMMTreeImplTraining(GEMMTreeImpl):
             self.weight_1.requires_grad_(False)
         if self.opt_level < 2:
             self.bias_1.requires_grad_(False)
+            
+        self.temp = 1.0  # Temperature controlling the boolean approximation
+        if constants.FINE_TUNE_TEMP in extra_config:
+            self.temp = 1 / extra_config[constants.FINE_TUNE_TEMP]
 
     def first_layer_activation(self, x):
-        return self.dropout(x.tanh_())
+        return self.dropout((x * self.temp).tanh_())
 
     def second_layer_activation(self, x):
-        return self.dropout(x.tanh_())
+        return self.dropout((x * self.temp).tanh_())
 
 
 class GEMMGBDTImplTraining(GEMMTreeImplTraining):

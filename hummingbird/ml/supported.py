@@ -517,3 +517,7 @@ Dropout is diabled if this flag is not given."""
 TREE_OPT_LEVEL = "tree_opt_level"
 """Which optimization level to use for fine-tuning Tree-based models. Values can be: 1, 2, 3, 4.
 TREE_OPT_LEVEL is set to 4 by default."""
+
+FINE_TUNE_TEMP = "fine_tune_temp"
+"""Determines the temperature, which controls the boolean approximation. Default is 1. 0 means
+no approximation."""
