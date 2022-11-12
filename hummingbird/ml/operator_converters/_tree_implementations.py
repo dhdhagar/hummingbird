@@ -665,16 +665,25 @@ class GEMMTreeImplTraining(GEMMTreeImpl):
                     if extra_config[constants.FINE_TUNE_TEMP]['eval'] <= 0:
                         raise ValueError("FINE_TUNE_TEMP cannot be less than or equal to 0")
                     self.inv_temp_eval = 1 / extra_config[constants.FINE_TUNE_TEMP]['eval']
+        
+        self.activation_fn = torch.tanh
+        if constants.FINE_TUNE_ACTIVATION in extra_config:
+            if extra_config[constants.FINE_TUNE_ACTIVATION] == 'relu':
+                self.activation_fn = torch.relu
+            elif extra_config[constants.FINE_TUNE_ACTIVATION] == 'tanh':
+                self.activation_fn = torch.tanh
+            else:
+                raise ValueError("Invalid activation function passed to FINE_TUNE_ACTIVATION")
 
     def first_layer_activation(self, x):
         if self.training:
-            return self.dropout((x * self.inv_temp_train).tanh_())
-        return self.dropout((x * self.inv_temp_eval).tanh_())
+            return self.dropout(self.activation_fn(x * self.inv_temp_train))
+        return self.dropout(self.activation_fn(x * self.inv_temp_eval))
 
     def second_layer_activation(self, x):
         if self.training:
-            return self.dropout((x * self.inv_temp_train).tanh_())
-        return self.dropout((x * self.inv_temp_eval).tanh_())
+            return self.dropout(self.activation_fn(x * self.inv_temp_train))
+        return self.dropout(self.activation_fn(x * self.inv_temp_eval))
 
 
 class GEMMGBDTImplTraining(GEMMTreeImplTraining):

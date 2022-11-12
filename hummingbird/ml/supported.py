@@ -521,3 +521,6 @@ TREE_OPT_LEVEL is set to 4 by default."""
 FINE_TUNE_TEMP = "fine_tune_temp"
 """Determines the temperature, which controls the boolean approximation. Values allowed in R+. Default is 1. 
 ->0 means no approximation."""
+
+FINE_TUNE_ACTIVATION = "fine_tune_activation"
+"""Determines the activation function to use for GEMM-based fine-tuning. Default is tanh."""
