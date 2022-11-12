@@ -648,16 +648,23 @@ class GEMMTreeImplTraining(GEMMTreeImpl):
         if self.opt_level < 2:
             self.bias_1.requires_grad_(False)
             
-        self.inv_temp_train, self.inv_temp_eval = 1.0, 1.0  # Temperature controlling the boolean approximation. ->inf converts to the original boolean-valued fn.
+        # Temperature controlling the boolean approximation. ->inf converts to the original boolean-valued fn.
+        self.inv_temp_train, self.inv_temp_eval = torch.nn.Parameter(torch.tensor(1.0)), 1.0
         if constants.FINE_TUNE_TEMP in extra_config:
             if 'train' in extra_config[constants.FINE_TUNE_TEMP]:
                 if extra_config[constants.FINE_TUNE_TEMP]['train'] <= 0:
                     raise ValueError("FINE_TUNE_TEMP cannot be less than or equal to 0")
-                self.inv_temp_train = 1 / extra_config[constants.FINE_TUNE_TEMP]['train']
-            if 'eval' in extra_config[constants.FINE_TUNE_TEMP]:
-                if extra_config[constants.FINE_TUNE_TEMP]['eval'] <= 0:
-                    raise ValueError("FINE_TUNE_TEMP cannot be less than or equal to 0")
-                self.inv_temp_eval = 1 / extra_config[constants.FINE_TUNE_TEMP]['eval']
+                self.inv_temp_train.data = torch.tensor(1 / extra_config[constants.FINE_TUNE_TEMP]['train'])
+            self.inv_temp_train.requires_grad_(False)
+            if 'requires_grad' in extra_config[constants.FINE_TUNE_TEMP]:
+                if extra_config[constants.FINE_TUNE_TEMP]['requires_grad']:
+                    self.inv_temp_train.requires_grad_(True)
+                    self.inv_temp_eval = self.inv_temp_train
+            if not self.inv_temp_train.requires_grad:
+                if 'eval' in extra_config[constants.FINE_TUNE_TEMP]:
+                    if extra_config[constants.FINE_TUNE_TEMP]['eval'] <= 0:
+                        raise ValueError("FINE_TUNE_TEMP cannot be less than or equal to 0")
+                    self.inv_temp_eval = 1 / extra_config[constants.FINE_TUNE_TEMP]['eval']
 
     def first_layer_activation(self, x):
         if self.training:
