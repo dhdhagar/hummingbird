@@ -16,6 +16,7 @@ from . import constants
 from ._physical_operator import PhysicalOperator
 from . import _tree_commons
 
+from IPython import embed
 
 class TreeImpl(Enum):
     """
@@ -157,6 +158,7 @@ class GEMMTreeImpl(AbstractPyTorchTreeImpl):
         return x == 0
 
     def forward(self, x):
+        embed()
         x = x.t()
         x = torch.mm(self.weight_1, x) + self.bias_1
         x = self.first_layer_activation(x)
